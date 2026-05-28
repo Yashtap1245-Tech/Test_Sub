@@ -3,6 +3,8 @@
 PolicyLens is a premium, client-side web application designed to help non-technical policy analysts explore and extract insights from Washington State Vendor Payments data (FY2022 and FY2023) without writing any queries, SQL, or python code.
 
 ---
+![alt text](image-1.png)
+
 
 ## 1. The Problem & Chosen Direction
 
