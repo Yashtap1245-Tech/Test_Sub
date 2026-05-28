@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PolicyLens — AI-Powered Vendor Spend Explorer</title>
+  <link rel="stylesheet" href="./style.css">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js and D3.js CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+</head>
+<body>
+
+  <!-- Top Header bar -->
+  <header>
+    <div class="header-content">
+      <div class="logo-container">
+        <div class="logo-icon">PL</div>
+        <div class="logo-text">
+          <h1>PolicyLens</h1>
+          <span>Washington State Spend Explorer (FY2022-23)</span>
+        </div>
+      </div>
+      
+      <div class="kpis-container">
+        <div class="kpi-item">
+          <div class="kpi-label">Total Biennium Spend</div>
+          <div class="kpi-value" id="kpi-total-spend">$0.00</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">Total Transactions</div>
+          <div class="kpi-value" id="kpi-total-txs">0</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">Active Vendors</div>
+          <div class="kpi-value" id="kpi-active-vendors">0</div>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button class="btn-icon" id="btn-toggle-key" title="Manage Gemini API Key">
+          <i class="fa-solid fa-key"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Primary Application Layout -->
+  <div class="app-container">
+    
+    <!-- Sidebar (Filters in Manual Mode, Metadata / Logs in AI Mode) -->
+    <aside class="sidebar">
+      
+      <!-- Toggle Filter / Control Panel -->
+      <div class="glass-card" id="control-panel">
+        <div class="sidebar-title" id="control-panel-title">Explore Controls</div>
+        
+        <!-- Mode indicator tag -->
+        <div style="margin-bottom: 16px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+          <span style="color: var(--text-muted)">Mode:</span>
+          <span id="mode-badge" style="background: rgba(79,142,247,0.15); color: var(--accent-color); font-weight:600; padding: 2px 8px; border-radius: 20px; font-size: 11px;">Manual</span>
+        </div>
+        
+        <form id="filters-form">
+          <!-- Agency Filter -->
+          <div class="form-group">
+            <label for="filter-agency">Agency</label>
+            <select class="form-control" id="filter-agency">
+              <option value="">-- All Agencies --</option>
+            </select>
+          </div>
+
+          <!-- Spend Category Filter -->
+          <div class="form-group">
+            <label for="filter-category">Spend Category</label>
+            <select class="form-control" id="filter-category">
+              <option value="">-- All Categories --</option>
+            </select>
+          </div>
+
+          <!-- Fiscal Year -->
+          <div class="form-group">
+            <label>Fiscal Year</label>
+            <div style="display: flex; gap: 10px; margin-top: 4px;">
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-main);">
+                <input type="radio" name="filter-year" value="" checked> Both
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-main);">
+                <input type="radio" name="filter-year" value="2022"> 2022
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--text-main);">
+                <input type="radio" name="filter-year" value="2023"> 2023
+              </label>
+            </div>
+          </div>
+
+          <!-- Spend Threshold Slider -->
+          <div class="form-group">
+            <label for="filter-min-spend">Min Spend Threshold</label>
+            <div class="slider-container">
+              <input type="range" id="filter-min-spend" min="0" max="10000000" step="50000" value="0" style="width: 100%; accent-color: var(--accent-color);">
+              <div class="slider-values">
+                <span>$0</span>
+                <span id="min-spend-val">$0</span>
+              </div>
+            </div>
+          </div>
+          
+          <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 10px;" id="btn-apply-filters">
+            Apply Filters
+          </button>
+        </form>
+      </div>
+
+      <!-- Live Event Log (Visualizes structured logs in real time) -->
+      <div class="glass-card system-logs-card" style="flex-grow: 1;">
+        <div class="logs-header">
+          <div class="sidebar-title" style="margin-bottom:0; border:none; padding:0;">System Logs (Audit)</div>
+          <button id="btn-clear-logs" style="background:none; border:none; color: var(--text-muted); cursor:pointer; font-size:10px;" title="Clear log window">
+            <i class="fa-solid fa-trash"></i> Clear
+          </button>
+        </div>
+        <div class="terminal-box" id="log-terminal">
+          <div class="log-entry">
+            <span class="log-time">[15:08:44]</span>
+            <span class="log-event">SYSTEM_INIT</span>
+            <span class="log-meta">Welcome to PolicyLens auditing feed.</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- AI Question Bar Card -->
+      <div class="glass-card search-box-card">
+        <div class="search-bar-wrapper">
+          <input type="text" class="search-input" id="search-input" placeholder="Ask a question about the budget in plain English..." disabled>
+          <button class="btn-search" id="btn-submit-question" disabled>
+            <i class="fa-solid fa-sparkles"></i> Ask AI
+          </button>
+        </div>
+        
+        <!-- Example chips for easy user click -->
+        <div class="chips-container" id="example-chips-container">
+          <span style="font-size: 12px; color: var(--text-darker); align-self: center; margin-right: 6px;">Try asking:</span>
+          <span class="prompt-chip" data-q="What were the top 10 categories of spend in 2023?">Top categories in 2023</span>
+          <span class="prompt-chip" data-q="Which vendors got the most money from the Health Care Authority?">Health Care Authority top vendors</span>
+          <span class="prompt-chip" data-q="How did Department of Transportation spending change month over month?">DOT month over month</span>
+          <span class="prompt-chip" data-q="Which agencies spent the most on personal service contracts?">Personal service contracts by agency</span>
+        </div>
+      </div>
+      
+      <!-- AI Upgrade Banner (visible only if no API key is provided) -->
+      <div class="ai-upgrade-banner" id="ai-upgrade-banner">
+        <div class="banner-text">
+          <h4>💡 Plain English mode is currently locked</h4>
+          <p>Provide a Gemini API key to ask natural language questions directly and generate text summaries.</p>
+        </div>
+        <button class="btn btn-secondary" id="btn-unlock-banner">
+          <i class="fa-solid fa-key" style="margin-right:6px;"></i> Unlock AI
+        </button>
+      </div>
+
+      <!-- Results View Card -->
+      <div class="glass-card results-card">
+        <div class="results-header">
+          <div class="results-title-group">
+            <h2 id="result-intent-title">Overview Dashboard</h2>
+            <p id="result-meta-subtitle">Displaying aggregates across all agencies, categories, and subcategories.</p>
+          </div>
+          
+          <!-- Visualization Selector Tab Bar -->
+          <div class="visual-tabs" id="visual-chart-selector">
+            <button class="visual-tab active" data-type="bar" title="Rankings"><i class="fa-solid fa-chart-bar"></i> Bar</button>
+            <button class="visual-tab" data-type="line" title="Monthly Trend"><i class="fa-solid fa-chart-line"></i> Line</button>
+            <button class="visual-tab" data-type="treemap" title="Composition"><i class="fa-solid fa-chart-pie"></i> Treemap</button>
+            <button class="visual-tab" data-type="doughnut" title="Distribution"><i class="fa-solid fa-chart-donut"></i> Doughnut</button>
+            <button class="visual-tab" data-type="scatter" title="Concentration Matrix"><i class="fa-solid fa-chart-scatter"></i> Scatter</button>
+          </div>
+        </div>
+
+        <!-- Chart render wrapper -->
+        <div class="chart-wrapper">
+          <canvas id="main-chart-canvas"></canvas>
+          <div id="treemap-container"></div>
+        </div>
+
+        <!-- Skeleton Loading Loader -->
+        <div class="loading-placeholder" id="shimmer-placeholder">
+          <div class="skeleton-shimmer placeholder-chart"></div>
+          <div class="skeleton-shimmer placeholder-summary"></div>
+        </div>
+
+        <!-- Result details (AI Summary or Manual stats card) -->
+        <div id="result-details-box">
+          <div class="ai-summary-box" id="ai-summary-box" style="display:none;">
+            <div class="ai-icon-bubble">
+              <i class="fa-solid fa-sparkles"></i>
+            </div>
+            <div class="ai-summary-text">
+              <span id="ai-summary-content">AI is analyzing results...</span>
+              <p class="meta-summary" id="ai-summary-meta">Engine: gemini-1.5-flash | Latency: 0ms</p>
+            </div>
+          </div>
+
+          <div class="manual-stats-box" id="manual-stats-box">
+            <div class="manual-stats-title">Scope Totals</div>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-card-label">Matching Spend</div>
+                <div class="stat-card-val" id="stats-matching-spend">$0.00</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-label">Aggregated Categories</div>
+                <div class="stat-card-val" id="stats-matching-cats">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-label">Filter Duration</div>
+                <div class="stat-card-val" id="stats-duration">0ms</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transparency Panel (Explains filters to non-technical users) -->
+        <div class="transparency-section" id="transparency-section" style="display:none;">
+          <div class="transparency-header" id="transparency-header-btn">
+            <div class="transparency-title">
+              <i class="fa-solid fa-magnifying-glass-chart"></i> How was this calculated?
+            </div>
+            <i class="fa-solid fa-chevron-down" id="transparency-chevron" style="color:var(--text-muted);"></i>
+          </div>
+          <div class="transparency-content" id="transparency-details">
+            This graph matches spending filters: 
+            <span id="transparency-filter-list">Agency: <span class="filter-badge">All</span></span>.
+            The graph is grouped by <span class="filter-badge" id="transparency-group-by">Category</span> and sorted descending.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- API Key Input Modal Overlay -->
+  <div class="modal-overlay" id="key-modal">
+    <div class="glass-card modal-content">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-key" style="color: var(--accent-color);"></i> Unlock Plain English Mode
+        </div>
+        <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px;" id="btn-close-modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Unlock the ability to ask natural language questions directly and generate summaries of the payment data.</p>
+        <p>Your API key is stored <strong>locally in your browser</strong> and is only used to communicate with the Gemini API directly from this webpage. It is never uploaded or sent to third-party servers.</p>
+        
+        <div class="form-group" style="margin-top:16px;">
+          <label for="modal-input-key">Gemini API Key</label>
+          <input type="password" class="form-control" id="modal-input-key" placeholder="AIzaSy...">
+          <div style="font-size:11px; margin-top: 6px; color: var(--text-muted);">
+            Don't have a key? Get one for free at <a href="https://aistudio.google.com/" target="_blank" style="color: var(--accent-color);">Google AI Studio</a>.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-skip-key">Explore Without Key</button>
+        <button class="btn btn-primary" id="btn-save-key">Save and Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import JS Entry Point -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
